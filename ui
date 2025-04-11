@@ -1,0 +1,574 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
+local CoreGui = game:GetService("CoreGui")
+
+local SigmaUI = {}
+SigmaUI.__index = SigmaUI
+
+function SigmaUI.new()
+    local self = setmetatable({}, SigmaUI)
+    
+    -- Create UI sounds
+    self.uiClick = Instance.new("Sound")
+    self.uiClick.Name = "UIClick"
+    self.uiClick.SoundId = "rbxassetid://6895079853"
+    self.uiClick.Volume = 0.5
+    self.uiClick.Parent = SoundService
+
+    self.uiHover = Instance.new("Sound")
+    self.uiHover.Name = "UIHover"
+    self.uiHover.SoundId = "rbxassetid://6895079733"
+    self.uiHover.Volume = 0.25
+    self.uiHover.Parent = SoundService
+
+    self.uiToggle = Instance.new("Sound")
+    self.uiToggle.Name = "UIToggle"
+    self.uiToggle.SoundId = "rbxassetid://6895079999"
+    self.uiToggle.Volume = 0.5
+    self.uiToggle.Parent = SoundService
+
+    self.uiSlide = Instance.new("Sound")
+    self.uiSlide.Name = "UISlide"
+    self.uiSlide.SoundId = "rbxassetid://6895080000"
+    self.uiSlide.Volume = 0.25
+    self.uiSlide.Parent = SoundService
+
+    -- UI Sounds enabled state
+    self.uiSoundsEnabled = false
+    
+    -- Store pages and buttons
+    self.pages = {}
+    self.buttons = {}
+    
+    return self
+end
+
+function SigmaUI:CreateWindow(title)
+    local player = Players.LocalPlayer or Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+    if not player then return end
+    
+    -- Create ScreenGui
+    self.gui = Instance.new("ScreenGui")
+    self.gui.Name = "SigmaSploit"
+    self.gui.ResetOnSpawn = false
+    self.gui.DisplayOrder = 999999999
+    self.gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    self.gui.IgnoreGuiInset = true
+    
+    -- Try to parent to CoreGui first, fall back to PlayerGui
+    local success, _ = pcall(function()
+        self.gui.Parent = CoreGui
+    end)
+    
+    if not success then
+        local playerGui = player:WaitForChild("PlayerGui", 10)
+        if not playerGui then return end
+        self.gui.Parent = playerGui
+    end
+    
+    -- Create blur effect
+    self.blur = Instance.new("BlurEffect")
+    self.blur.Size = 0
+    self.blur.Parent = game:GetService("Lighting")
+    
+    -- Create main container
+    self.mainContainer = Instance.new("Frame")
+    self.mainContainer.Name = "MainContainer"
+    self.mainContainer.Size = UDim2.new(0, 600, 0, 400)
+    self.mainContainer.Position = UDim2.new(0.5, -300, 0.5, -200)
+    self.mainContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    self.mainContainer.BorderSizePixel = 0
+    self.mainContainer.ClipsDescendants = true
+    self.mainContainer.Parent = self.gui
+    
+    -- Apply corner radius
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.Parent = self.mainContainer
+    
+    -- Create shadow
+    local shadow = Instance.new("ImageLabel")
+    shadow.Name = "Shadow"
+    shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+    shadow.BackgroundTransparency = 1
+    shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    shadow.Size = UDim2.new(1, 47, 1, 47)
+    shadow.ZIndex = 0
+    shadow.Image = "rbxassetid://6014261993"
+    shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.ImageTransparency = 0.5
+    shadow.Parent = self.mainContainer
+    
+    -- Title bar
+    self.titleBar = Instance.new("Frame")
+    self.titleBar.Name = "TitleBar"
+    self.titleBar.Size = UDim2.new(1, 0, 0, 40)
+    self.titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    self.titleBar.BackgroundTransparency = 0.1
+    self.titleBar.BorderSizePixel = 0
+    self.titleBar.Parent = self.mainContainer
+    
+    local titleBarCorner = Instance.new("UICorner")
+    titleBarCorner.CornerRadius = UDim.new(0, 8)
+    titleBarCorner.Parent = self.titleBar
+    
+    -- Title text
+    local titleText = Instance.new("TextLabel")
+    titleText.Name = "TitleText"
+    titleText.Size = UDim2.new(1, -20, 1, 0)
+    titleText.Position = UDim2.new(0, 20, 0, 0)
+    titleText.BackgroundTransparency = 1
+    titleText.Text = title
+    titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleText.TextSize = 18
+    titleText.Font = Enum.Font.GothamBold
+    titleText.TextXAlignment = Enum.TextXAlignment.Left
+    titleText.Parent = self.titleBar
+    
+    -- Close button
+    self.closeButton = Instance.new("ImageButton")
+    self.closeButton.Name = "CloseButton"
+    self.closeButton.Size = UDim2.new(0, 26, 0, 26)
+    self.closeButton.Position = UDim2.new(1, -33, 0, 7)
+    self.closeButton.BackgroundTransparency = 1
+    self.closeButton.Image = "rbxassetid://7072725342"
+    self.closeButton.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    self.closeButton.Parent = self.titleBar
+    
+    -- Minimize button
+    self.minimizeButton = Instance.new("ImageButton")
+    self.minimizeButton.Name = "MinimizeButton"
+    self.minimizeButton.Size = UDim2.new(0, 26, 0, 26)
+    self.minimizeButton.Position = UDim2.new(1, -63, 0, 7)
+    self.minimizeButton.BackgroundTransparency = 1
+    self.minimizeButton.Image = "rbxassetid://7072719338"
+    self.minimizeButton.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    self.minimizeButton.Parent = self.titleBar
+    
+    -- Content container
+    self.contentContainer = Instance.new("Frame")
+    self.contentContainer.Name = "ContentContainer"
+    self.contentContainer.Size = UDim2.new(1, -140, 1, -50)
+    self.contentContainer.Position = UDim2.new(0, 140, 0, 50)
+    self.contentContainer.BackgroundTransparency = 1
+    self.contentContainer.Parent = self.mainContainer
+    
+    -- Navigation panel
+    self.navPanel = Instance.new("ScrollingFrame")
+    self.navPanel.Name = "NavPanel"
+    self.navPanel.Size = UDim2.new(0, 130, 1, -40)
+    self.navPanel.Position = UDim2.new(0, 0, 0, 40)
+    self.navPanel.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    self.navPanel.BorderSizePixel = 0
+    self.navPanel.ScrollBarThickness = 2
+    self.navPanel.ScrollBarImageColor3 = Color3.fromRGB(45, 45, 50)
+    self.navPanel.CanvasSize = UDim2.new(0, 0, 0, 0)
+    self.navPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    self.navPanel.Parent = self.mainContainer
+    
+    -- Navigation panel layout
+    local navList = Instance.new("UIListLayout")
+    navList.Padding = UDim.new(0, 4)
+    navList.Parent = self.navPanel
+    
+    -- Navigation panel padding
+    local navPadding = Instance.new("UIPadding")
+    navPadding.PaddingTop = UDim.new(0, 10)
+    navPadding.PaddingBottom = UDim.new(0, 10)
+    navPadding.PaddingLeft = UDim.new(0, 10)
+    navPadding.PaddingRight = UDim.new(0, 10)
+    navPadding.Parent = self.navPanel
+    
+    -- Make window draggable
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
+    
+    local function update(input)
+        local delta = input.Position - dragStart
+        self.mainContainer.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+    
+    self.titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = self.mainContainer.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    self.titleBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+    
+    -- Close button functionality
+    self.closeButton.MouseButton1Click:Connect(function()
+        TweenService:Create(self.blur, TweenInfo.new(0.3), {Size = 0}):Play()
+        TweenService:Create(self.mainContainer, TweenInfo.new(0.3), {
+            Size = UDim2.new(0, 0, 0, 0),
+            Position = UDim2.new(0.5, 0, 0.5, 0)
+        }):Play()
+        task.wait(0.3)
+        self.gui:Destroy()
+        self.blur:Destroy()
+    end)
+    
+    -- Minimize button functionality
+    local minimized = false
+    self.minimizeButton.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        local size = minimized and UDim2.new(0, 600, 0, 40) or UDim2.new(0, 600, 0, 400)
+        TweenService:Create(self.mainContainer, TweenInfo.new(0.3), {Size = size}):Play()
+    end)
+    
+    -- Opening animation
+    self.mainContainer.Size = UDim2.new(0, 0, 0, 0)
+    self.mainContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
+    
+    TweenService:Create(self.mainContainer, TweenInfo.new(0.3), {
+        Size = UDim2.new(0, 600, 0, 400),
+        Position = UDim2.new(0.5, -300, 0.5, -200)
+    }):Play()
+    
+    return self
+end
+
+function SigmaUI:AddPage(name, icon)
+    -- Create navigation button
+    local button = Instance.new("TextButton")
+    button.Name = name .. "Nav"
+    button.Size = UDim2.new(1, 0, 0, 36)
+    button.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    button.BackgroundTransparency = 0.5
+    button.Text = ""
+    button.AutoButtonColor = false
+    button.Parent = self.navPanel
+    
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(0, 6)
+    buttonCorner.Parent = button
+    
+    -- Create container for icon and text
+    local container = Instance.new("Frame")
+    container.Name = "Container"
+    container.Size = UDim2.new(1, -16, 1, 0)
+    container.Position = UDim2.new(0, 8, 0, 0)
+    container.BackgroundTransparency = 1
+    container.Parent = button
+    
+    local buttonIcon = Instance.new("ImageLabel")
+    buttonIcon.Size = UDim2.new(0, 20, 0, 20)
+    buttonIcon.Position = UDim2.new(0, 0, 0.5, -10)
+    buttonIcon.BackgroundTransparency = 1
+    buttonIcon.Image = icon
+    buttonIcon.ImageColor3 = Color3.fromRGB(180, 180, 180)
+    buttonIcon.Parent = container
+    
+    local buttonText = Instance.new("TextLabel")
+    buttonText.Size = UDim2.new(1, -28, 1, 0)
+    buttonText.Position = UDim2.new(0, 28, 0, 0)
+    buttonText.BackgroundTransparency = 1
+    buttonText.Text = name
+    buttonText.TextColor3 = Color3.fromRGB(180, 180, 180)
+    buttonText.TextSize = 14
+    buttonText.Font = Enum.Font.GothamMedium
+    buttonText.TextXAlignment = Enum.TextXAlignment.Left
+    buttonText.Parent = container
+    
+    -- Create page
+    local page = Instance.new("ScrollingFrame")
+    page.Name = name .. "Page"
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 2
+    page.ScrollBarImageColor3 = Color3.fromRGB(45, 45, 50)
+    page.Visible = false
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.Parent = self.contentContainer
+    
+    local padding = Instance.new("UIPadding")
+    padding.PaddingLeft = UDim.new(0, 20)
+    padding.PaddingRight = UDim.new(0, 20)
+    padding.PaddingTop = UDim.new(0, 20)
+    padding.PaddingBottom = UDim.new(0, 20)
+    padding.Parent = page
+    
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 10)
+    listLayout.Parent = page
+    
+    -- Store button and page
+    self.buttons[name] = button
+    self.pages[name] = page
+    
+    -- Button functionality
+    local isSelected = false
+    
+    button.MouseButton1Click:Connect(function()
+        if self.uiSoundsEnabled then
+            self.uiClick:Play()
+        end
+        
+        -- Hide all pages
+        for _, p in pairs(self.pages) do
+            p.Visible = false
+        end
+        
+        -- Reset all buttons
+        for _, b in pairs(self.buttons) do
+            TweenService:Create(b, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(35, 35, 40),
+                BackgroundTransparency = 0.5
+            }):Play()
+            
+            local icon = b.Container:FindFirstChild("ImageLabel")
+            local text = b.Container:FindFirstChild("TextLabel")
+            
+            if icon then
+                TweenService:Create(icon, TweenInfo.new(0.2), {
+                    ImageColor3 = Color3.fromRGB(180, 180, 180)
+                }):Play()
+            end
+            
+            if text then
+                TweenService:Create(text, TweenInfo.new(0.2), {
+                    TextColor3 = Color3.fromRGB(180, 180, 180)
+                }):Play()
+            end
+        end
+        
+        -- Show selected page and update button
+        page.Visible = true
+        TweenService:Create(button, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(45, 45, 50),
+            BackgroundTransparency = 0.3
+        }):Play()
+        
+        TweenService:Create(buttonIcon, TweenInfo.new(0.2), {
+            ImageColor3 = Color3.fromRGB(255, 255, 255)
+        }):Play()
+        
+        TweenService:Create(buttonText, TweenInfo.new(0.2), {
+            TextColor3 = Color3.fromRGB(255, 255, 255)
+        }):Play()
+    end)
+    
+    -- Show first page by default
+    if next(self.pages) == name then
+        button.MouseButton1Click:Fire()
+    end
+    
+    return page
+end
+
+function SigmaUI:AddSection(page, title)
+    local section = Instance.new("Frame")
+    section.Name = title .. "Section"
+    section.Size = UDim2.new(1, 0, 0, 30)
+    section.BackgroundTransparency = 1
+    section.AutomaticSize = Enum.AutomaticSize.Y
+    section.Parent = page
+    
+    local sectionTitle = Instance.new("TextLabel")
+    sectionTitle.Size = UDim2.new(1, 0, 0, 20)
+    sectionTitle.BackgroundTransparency = 1
+    sectionTitle.Text = title
+    sectionTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    sectionTitle.TextSize = 16
+    sectionTitle.Font = Enum.Font.GothamBold
+    sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+    sectionTitle.Parent = section
+    
+    local sectionContent = Instance.new("Frame")
+    sectionContent.Name = "Content"
+    sectionContent.Size = UDim2.new(1, 0, 0, 0)
+    sectionContent.Position = UDim2.new(0, 0, 0, 25)
+    sectionContent.BackgroundTransparency = 1
+    sectionContent.AutomaticSize = Enum.AutomaticSize.Y
+    sectionContent.Parent = section
+    
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 8)
+    listLayout.Parent = sectionContent
+    
+    return section, sectionContent
+end
+
+function SigmaUI:AddToggle(parent, name, callback)
+    local toggle = Instance.new("Frame")
+    toggle.Name = name .. "Toggle"
+    toggle.Size = UDim2.new(1, 0, 0, 35)
+    toggle.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    toggle.Parent = parent
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(0, 6)
+    toggleCorner.Parent = toggle
+    
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(0, 44, 0, 24)
+    toggleButton.Position = UDim2.new(1, -54, 0.5, -12)
+    toggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    toggleButton.Text = ""
+    toggleButton.Parent = toggle
+    
+    local toggleButtonCorner = Instance.new("UICorner")
+    toggleButtonCorner.CornerRadius = UDim.new(1, 0)
+    toggleButtonCorner.Parent = toggleButton
+    
+    local toggleCircle = Instance.new("Frame")
+    toggleCircle.Size = UDim2.new(0, 18, 0, 18)
+    toggleCircle.Position = UDim2.new(0, 3, 0.5, -9)
+    toggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    toggleCircle.Parent = toggleButton
+    
+    local toggleCircleCorner = Instance.new("UICorner")
+    toggleCircleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCircleCorner.Parent = toggleCircle
+    
+    local toggleText = Instance.new("TextLabel")
+    toggleText.Size = UDim2.new(1, -64, 1, 0)
+    toggleText.Position = UDim2.new(0, 10, 0, 0)
+    toggleText.BackgroundTransparency = 1
+    toggleText.Text = name
+    toggleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleText.TextSize = 14
+    toggleText.Font = Enum.Font.Gotham
+    toggleText.TextXAlignment = Enum.TextXAlignment.Left
+    toggleText.Parent = toggle
+    
+    local toggled = false
+    toggleButton.MouseButton1Click:Connect(function()
+        if self.uiSoundsEnabled then
+            self.uiToggle:Play()
+        end
+        
+        toggled = not toggled
+        local pos = toggled and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+        local color = toggled and Color3.fromRGB(0, 255, 128) or Color3.fromRGB(45, 45, 50)
+        
+        TweenService:Create(toggleCircle, TweenInfo.new(0.2), {Position = pos}):Play()
+        TweenService:Create(toggleButton, TweenInfo.new(0.2), {BackgroundColor3 = color}):Play()
+        
+        if callback then callback(toggled) end
+    end)
+    
+    return toggle
+end
+
+function SigmaUI:AddSlider(parent, name, min, max, default, callback)
+    local slider = Instance.new("Frame")
+    slider.Name = name .. "Slider"
+    slider.Size = UDim2.new(1, 0, 0, 50)
+    slider.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+    slider.Parent = parent
+    
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 6)
+    sliderCorner.Parent = slider
+    
+    local sliderText = Instance.new("TextLabel")
+    sliderText.Size = UDim2.new(1, -10, 0, 20)
+    sliderText.Position = UDim2.new(0, 10, 0, 5)
+    sliderText.BackgroundTransparency = 1
+    sliderText.Text = name
+    sliderText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    sliderText.TextSize = 14
+    sliderText.Font = Enum.Font.Gotham
+    sliderText.TextXAlignment = Enum.TextXAlignment.Left
+    sliderText.Parent = slider
+    
+    local sliderValue = Instance.new("TextLabel")
+    sliderValue.Size = UDim2.new(0, 30, 0, 20)
+    sliderValue.Position = UDim2.new(1, -40, 0, 5)
+    sliderValue.BackgroundTransparency = 1
+    sliderValue.Text = tostring(default)
+    sliderValue.TextColor3 = Color3.fromRGB(255, 255, 255)
+    sliderValue.TextSize = 14
+    sliderValue.Font = Enum.Font.Gotham
+    sliderValue.Parent = slider
+    
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(1, -20, 0, 4)
+    sliderBar.Position = UDim2.new(0, 10, 0, 35)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
+    sliderBar.Parent = slider
+    
+    local sliderBarCorner = Instance.new("UICorner")
+    sliderBarCorner.CornerRadius = UDim.new(1, 0)
+    sliderBarCorner.Parent = sliderBar
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((default - min)/(max - min), 0, 1, 0)
+    sliderFill.BackgroundColor3 = Color3.fromRGB(0, 255, 128)
+    sliderFill.Parent = sliderBar
+    
+    local sliderFillCorner = Instance.new("UICorner")
+    sliderFillCorner.CornerRadius = UDim.new(1, 0)
+    sliderFillCorner.Parent = sliderFill
+    
+    local sliderButton = Instance.new("TextButton")
+    sliderButton.Size = UDim2.new(0, 16, 0, 16)
+    sliderButton.Position = UDim2.new((default - min)/(max - min), -8, 0.5, -8)
+    sliderButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sliderButton.Text = ""
+    sliderButton.Parent = sliderBar
+    
+    local sliderButtonCorner = Instance.new("UICorner")
+    sliderButtonCorner.CornerRadius = UDim.new(1, 0)
+    sliderButtonCorner.Parent = sliderButton
+    
+    local dragging = false
+    
+    sliderButton.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            if self.uiSoundsEnabled then
+                self.uiSlide:Play()
+            end
+            
+            local pos = math.clamp((input.Position.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X, 0, 1)
+            local value = math.floor(min + (max - min) * pos)
+            
+            TweenService:Create(sliderFill, TweenInfo.new(0.1), {Size = UDim2.new(pos, 0, 1, 0)}):Play()
+            TweenService:Create(sliderButton, TweenInfo.new(0.1), {Position = UDim2.new(pos, -8, 0.5, -8)}):Play()
+            
+            sliderValue.Text = tostring(value)
+            if callback then callback(value) end
+        end
+    end)
+    
+    return slider
+end
+
+return SigmaUI
