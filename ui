@@ -376,7 +376,7 @@ function SigmaUI:AddPage(name, icon)
     
     -- Show first page by default
     if next(self.pages) == name then
-        button.MouseButton1Click:Fire()
+        button.MouseButton1Click:Invoke()
     end
     
     return page
